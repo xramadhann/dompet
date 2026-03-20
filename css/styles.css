@@ -86,6 +86,13 @@ body {
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
 }
+
+.logo-icon img { 
+  width: 50px;
+  height: auto; 
+  border-radius: 10px;
+}
+
 .logo-text {
   font-size: 22px; font-weight: 800;
   color: var(--ink); letter-spacing: -0.3px;
