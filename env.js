@@ -42,8 +42,6 @@ const ENV = {
     exportCsv:     import.meta.env.VITE_FEATURE_EXPORT_CSV     === "true",
   },
 
-
-
   // ── App ────────────────────────────────────────────────────
   app: {
     name:           import.meta.env?.VITE_APP_NAME           ?? "Dompet",

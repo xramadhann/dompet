@@ -280,6 +280,9 @@ window.doRegister = async () => {
 };
 
 async function _loginSuccess(username, uid) {
+  // Simpan session biar tidak balik ke login pas refresh
+  localStorage.setItem("dompet_session", JSON.stringify({ username, uid }));
+
   // Muat data dari Firebase
   let data;
   try {
@@ -303,6 +306,7 @@ async function _loginSuccess(username, uid) {
 
 window.logout = () => {
   if (!confirm("Keluar dari akun ini?")) return;
+  localStorage.removeItem("dompet_session");
   resetState();
   document.getElementById("loginScreen").classList.remove("hidden");
   window.showPanel("login");
@@ -319,5 +323,21 @@ document.getElementById("tarikModalWrap")?.addEventListener("click", e => {
   if (e.target === e.currentTarget) window.closeTarikModal();
 });
 
-// ── Bootstrap ──────────────────────────────────────────────────
-window.showPanel("login");
+// ── Bootstrap — restore session kalau ada ─────────────────────
+(async () => {
+  try {
+    const raw = localStorage.getItem("dompet_session");
+    if (raw) {
+      const { username, uid } = JSON.parse(raw);
+      if (username && uid) {
+        // Langsung masuk tanpa perlu login ulang
+        await _loginSuccess(username, uid);
+        return;
+      }
+    }
+  } catch {
+    localStorage.removeItem("dompet_session");
+  }
+  // Tidak ada session — tampilkan login
+  window.showPanel("login");
+})();
