@@ -15,7 +15,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 // ── Init ───────────────────────────────────────────────────────
-const _app = initializeApp(ENV.firebase);
+export const _app = initializeApp(ENV.firebase);
 const _db  = getDatabase(_app);
 
 // ── Path helpers ───────────────────────────────────────────────

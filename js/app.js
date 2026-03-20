@@ -1,20 +1,23 @@
 /**
  * js/app.js
+ * ─────────────────────────────────────────────────────────────
  * Entry point aplikasi. Mengorkestrasi:
  *   - Login / register flow
  *   - Navigasi antar halaman
  *   - Modal tambah transaksi & tarik dana
  *   - Dialog konfirmasi defisit
+ * ─────────────────────────────────────────────────────────────
  */
 
-import { login as authLogin, register as authRegister } from "./services/auth.service.js";
-import { loadUserData }   from "./services/firebase.service.js";
+import { login as authLogin, register as authRegister, makeUID } from "./services/auth.service.js";
+import { loadUserData, _app } from "./services/firebase.service.js";
+import { initMessaging, requestNotifPermission, checkAndNotifyThreshold } from "./services/notification.service.js";
 import {
   state, initState, resetState, addTransaction, tarikInvestasi,
   checkDefisit, clearAll as clearAllTx, exportCSV, getTotalInvestasi,
 } from "./services/transaction.service.js";
 import { renderDashboard }   from "./pages/dashboard.page.js";
-import { renderTxPage, setFType as _setFType, setFCat as _setFCat, setSortOrd as _setSortOrd } from "./pages/transaksi.page.js";
+import { renderTxPage, setFType, setFCat, setSortOrd } from "./pages/transaksi.page.js";
 import { renderBudget }      from "./pages/anggaran.page.js";
 import { renderReport, shiftMonth } from "./pages/laporan.page.js";
 import {
@@ -23,7 +26,7 @@ import {
 } from "./pages/pengaturan.page.js";
 import {
   showToast, togglePw, formatAmtInput, parseAmt, rpFull,
-  renderTrendChart,
+  renderTrendChart, activeChartPeriod,
 } from "./ui.helpers.js";
 
 // ── Current page ───────────────────────────────────────────────
@@ -57,17 +60,10 @@ window.closeSidebar = () => { document.getElementById("sidebar").classList.remov
 
 // ── Chart tab ──────────────────────────────────────────────────
 window.switchChartTab = (el, period) => {
-  document.querySelectorAll(".chart-tab").forEach(e => e.classList.remove("active"));
-  el.classList.add("active");
-  renderTrendChart(
-    period,
-    state.transactions,
+  renderTrendChart(period, state.transactions,
     arr => arr.filter(t => t.type === "in").reduce((s, t) => s + t.amount, 0),
     arr => arr.filter(t => t.type === "out").reduce((s, t) => s + t.amount, 0),
-    (y, m) => state.transactions.filter(t => {
-      const d = new Date(t.date);
-      return d.getFullYear() === y && d.getMonth() === m;
-    })
+    (y, m) => state.transactions.filter(t => { const d = new Date(t.date); return d.getFullYear() === y && d.getMonth() === m; })
   );
 };
 
@@ -120,6 +116,7 @@ window.submitTx = async () => {
 
   const payload = { name, cat, amount: amt, date, type: txType, note };
 
+  // Cek defisit dulu
   if (txType === "out") {
     const defisit = checkDefisit(amt);
     if (defisit) {
@@ -202,20 +199,12 @@ window.submitTarik = async () => {
 window.setFType = el => {
   document.querySelectorAll("#filterBar [data-ft]").forEach(e => e.classList.remove("on"));
   el.classList.add("on");
-  _setFType(el.dataset.ft);
-  renderTxPage();
+  setFType(el.dataset.ft);
 };
 window.setFCat = el => {
   document.querySelectorAll("#filterBar [data-fc]").forEach(e => e.classList.remove("on"));
   el.classList.add("on");
-  _setFCat(el.dataset.fc);
-  renderTxPage();
-};
-window.setSortOrd = el => {
-  document.querySelectorAll("#filterBar [data-so]").forEach(e => e.classList.remove("on"));
-  el.classList.add("on");
-  _setSortOrd(el.dataset.so);
-  renderTxPage();
+  setFCat(el.dataset.fc);
 };
 
 // ── Pengaturan wiring ──────────────────────────────────────────
@@ -233,8 +222,8 @@ window.clearAll          = async () => {
 window.exportCSV = exportCSV;
 
 // ── Format input wiring ────────────────────────────────────────
-window.formatAmtInput   = formatAmtInput;
-window.formatInvInput   = formatAmtInput;
+window.formatAmtInput = formatAmtInput;
+window.formatInvInput = formatAmtInput;
 window.formatTarikInput = formatAmtInput;
 
 // ── Laporan wiring ─────────────────────────────────────────────
@@ -292,22 +281,31 @@ window.doRegister = async () => {
 };
 
 async function _loginSuccess(username, uid) {
+  // Simpan session biar tidak balik ke login pas refresh
   localStorage.setItem("dompet_session", JSON.stringify({ username, uid }));
 
+  // Muat data dari Firebase
   let data;
   try {
     data = await loadUserData(uid);
   } catch {
+    // Offline fallback
     const { loadFromCache } = await import("./services/transaction.service.js");
-    data = loadFromCache?.(username) ?? { transactions: [], saldoAwal: 0, investasiAwal: 0 };
+    data = loadFromCache(username);
   }
 
   initState(uid, username, data);
 
+  // Update sidebar
   document.getElementById("sidebarAvatar").textContent = username.slice(0, 2).toUpperCase();
   document.getElementById("sidebarName").textContent   = username;
   document.getElementById("loginScreen").classList.add("hidden");
 
+  // Init push notifikasi (tidak blocking)
+  initMessaging(_app);
+  requestNotifPermission(uid).catch(console.warn);
+
+  // Render halaman awal
   window.goTo("dashboard", null);
 }
 
@@ -330,13 +328,14 @@ document.getElementById("tarikModalWrap")?.addEventListener("click", e => {
   if (e.target === e.currentTarget) window.closeTarikModal();
 });
 
-// ── Bootstrap — restore session ────────────────────────────────
+// ── Bootstrap — restore session kalau ada ─────────────────────
 (async () => {
   try {
     const raw = localStorage.getItem("dompet_session");
     if (raw) {
       const { username, uid } = JSON.parse(raw);
       if (username && uid) {
+        // Langsung masuk tanpa perlu login ulang
         await _loginSuccess(username, uid);
         return;
       }
@@ -344,5 +343,6 @@ document.getElementById("tarikModalWrap")?.addEventListener("click", e => {
   } catch {
     localStorage.removeItem("dompet_session");
   }
+  // Tidak ada session — tampilkan login
   window.showPanel("login");
 })();
