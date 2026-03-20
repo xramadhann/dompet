@@ -1576,13 +1576,90 @@ select.form-input option { background: var(--white); }
 <!-- ─── TOAST ────────────────────────────────── -->
 <div class="toast" id="toast"></div>
 
+<!-- ─── FIREBASE SDK ───────────────────────────── -->
+<script type="module">
+  // ╔══════════════════════════════════════════════════════════╗
+  // ║  FIREBASE CONFIGURATION                                  ║
+  // ║  Ganti nilai di bawah dengan config Firebase project-mu  ║
+  // ║  Bisa didapat dari: Firebase Console → Project Settings  ║
+  // ╚══════════════════════════════════════════════════════════╝
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import {
+    getDatabase, ref, set, get, push, remove, update, onValue, off
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDo3jwhd4Nz339HDdZdo32ArWWjUHh-Q4M",
+  authDomain: "dompet-64e72.firebaseapp.com",
+  databaseURL: "https://dompet-64e72-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "dompet-64e72",
+  storageBucket: "dompet-64e72.firebasestorage.app",
+  messagingSenderId: "272498971576",
+  appId: "1:272498971576:web:620874bd0989002ce5354d",
+  measurementId: "G-KRGF196PM4"
+};
+
+  const app = initializeApp(firebaseConfig);
+  const db  = getDatabase(app);
+
+  // ── Expose ke global scope agar script non-module bisa akses ──
+  window.__fbDB       = db;
+  window.__fbRef      = ref;
+  window.__fbSet      = set;
+  window.__fbGet      = get;
+  window.__fbPush     = push;
+  window.__fbRemove   = remove;
+  window.__fbUpdate   = update;
+  window.__fbOnValue  = onValue;
+  window.__fbOff      = off;
+  window.__firebaseReady = true;
+
+  // Dispatch event supaya script utama tahu Firebase sudah siap
+  document.dispatchEvent(new Event('firebaseReady'));
+</script>
+
 <!-- ─── CHART.JS ─────────────────────────────── -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 
 <!-- ─── SCRIPT ───────────────────────────────── -->
 <script>
+/* ════════════════════════════════════════════════════════════════
+   FIREBASE REALTIME DATABASE — LAYER INTEGRASI
+   Semua penyimpanan data (txs, saldo, investasi, user, password)
+   dialihkan dari localStorage ke Firebase RTDB.
+   localStorage hanya digunakan sebagai cache sementara / fallback.
+   ════════════════════════════════════════════════════════════════ */
+
+/* ─── FIREBASE HELPERS ───────────────────────── */
+
+// Tunggu Firebase siap, lalu jalankan callback
+function withDB(fn) {
+  if (window.__firebaseReady && window.__fbDB) { fn(window.__fbDB); }
+  else { document.addEventListener('firebaseReady', () => fn(window.__fbDB), { once: true }); }
+}
+
+// Path helpers
+const fbPath = {
+  user:       uid => `users/${uid}`,
+  profile:    uid => `users/${uid}/profile`,
+  password:   uid => `users/${uid}/password_hash`,
+  saldo:      uid => `users/${uid}/saldo_awal`,
+  investasi:  uid => `users/${uid}/investasi_awal`,
+  lastYM:     uid => `users/${uid}/last_ym`,
+  txs:        uid => `users/${uid}/transactions`,
+  tx:         (uid, txId) => `users/${uid}/transactions/${txId}`,
+  userIndex:  ()  => `user_index`,         // daftar semua username
+  usernameMap:()  => `username_to_uid`,    // username → uid (untuk lookup login)
+};
+
+// Buat UID sederhana dari username (deterministik, bukan random)
+function makeUID(username) {
+  return 'u_' + username.toLowerCase().replace(/[^a-z0-9_\-]/g, '_');
+}
+
 /* ─── MULTI-USER MANAGEMENT ──────────────────── */
 let currentUser = null; // string: username
+let currentUID  = null; // string: uid di Firebase
 
 /* ── Simple hash (tidak kriptografis kuat, cukup untuk privasi lokal) ── */
 function simpleHash(str) {
@@ -1594,23 +1671,83 @@ function simpleHash(str) {
   return (hash >>> 0).toString(36);
 }
 
+/* ── allUsers: ambil dari Firebase, fallback ke localStorage ── */
 function allUsers() {
   try { return JSON.parse(localStorage.getItem('dompet_users') || '[]'); } catch(e) { return []; }
 }
 function saveUsers(list) {
   try { localStorage.setItem('dompet_users', JSON.stringify(list)); } catch(e) {}
+  // Sync ke Firebase
+  withDB(db => {
+    const map = {};
+    list.forEach(u => { map[makeUID(u)] = u; });
+    window.__fbSet(window.__fbRef(db, fbPath.userIndex()), map).catch(console.error);
+  });
 }
-function uk(key) { return `dompet_u_${currentUser}_${key}`; } // user-scoped key
+function uk(key) { return `dompet_u_${currentUser}_${key}`; } // user-scoped key (masih dipakai untuk cache)
 
-/* Simpan password hash untuk user */
+/* ─── PASSWORD: simpan ke Firebase (dengan hash) ─── */
 function saveUserPassword(username, password) {
   const hash = simpleHash(username + ':' + password);
+  // localStorage cache
   try { localStorage.setItem(`dompet_pw_${username}`, hash); } catch(e) {}
+  // Firebase
+  const uid = makeUID(username);
+  withDB(db => {
+    window.__fbSet(window.__fbRef(db, fbPath.password(uid)), hash).catch(console.error);
+    // Simpan juga mapping username → uid untuk keperluan login lookup
+    window.__fbSet(window.__fbRef(db, `username_to_uid/${username}`), uid).catch(console.error);
+  });
 }
 function checkUserPassword(username, password) {
+  // Prioritas: cek dari localStorage cache dulu (sinkron, cepat)
   const stored = localStorage.getItem(`dompet_pw_${username}`);
   if (!stored) return false;
   return stored === simpleHash(username + ':' + password);
+}
+
+/* ─── checkUserPasswordAsync: verifikasi langsung ke Firebase ─── */
+function checkUserPasswordAsync(username, password, callback) {
+  const uid = makeUID(username);
+  withDB(db => {
+    window.__fbGet(window.__fbRef(db, fbPath.password(uid)))
+      .then(snap => {
+        if (!snap.exists()) { callback(false); return; }
+        const hash = simpleHash(username + ':' + password);
+        const match = snap.val() === hash;
+        // Update cache lokal
+        if (match) {
+          try { localStorage.setItem(`dompet_pw_${username}`, snap.val()); } catch(e) {}
+        }
+        callback(match);
+      })
+      .catch(() => {
+        // Fallback ke cache lokal jika offline
+        callback(checkUserPassword(username, password));
+      });
+  });
+}
+
+/* ─── checkUserExistsAsync: cek apakah user ada di Firebase ─── */
+function checkUserExistsAsync(username, callback) {
+  const uid = makeUID(username);
+  withDB(db => {
+    window.__fbGet(window.__fbRef(db, fbPath.profile(uid)))
+      .then(snap => {
+        const exists = snap.exists();
+        // Update cache lokal
+        const users = allUsers();
+        if (exists && !users.includes(username)) {
+          users.push(username);
+          try { localStorage.setItem('dompet_users', JSON.stringify(users)); } catch(e) {}
+        }
+        callback(exists);
+      })
+      .catch(() => {
+        // Fallback ke localStorage jika offline
+        callback(allUsers().includes(username));
+      });
+  });
 }
 
 /* ── Panel switcher ── */
@@ -1656,21 +1793,25 @@ function doLogin() {
   if (!username) { showLoginError('Masukkan username.'); return; }
   if (!password) { showLoginError('Masukkan password.'); return; }
 
-  const users = allUsers();
-  if (!users.includes(username)) {
-    showLoginError('Akun tidak ditemukan. Cek username atau buat akun baru.');
-    return;
-  }
-  if (!checkUserPassword(username, password)) {
-    showLoginError('Password salah. Coba lagi.');
-    return;
-  }
-  login(username);
+  // Cek ke Firebase (async) dengan fallback localStorage
+  checkUserExistsAsync(username, exists => {
+    if (!exists) {
+      showLoginError('Akun tidak ditemukan. Cek username atau buat akun baru.');
+      return;
+    }
+    checkUserPasswordAsync(username, password, match => {
+      if (!match) {
+        showLoginError('Password salah. Coba lagi.');
+        return;
+      }
+      login(username);
+    });
+  });
 }
 
 function doRegister() {
-  const username = document.getElementById('regUsername').value.trim();
-  const password = document.getElementById('regPassword').value;
+  const username  = document.getElementById('regUsername').value.trim();
+  const password  = document.getElementById('regPassword').value;
   const password2 = document.getElementById('regPassword2').value;
   document.getElementById('regError').style.display = 'none';
 
@@ -1679,16 +1820,46 @@ function doRegister() {
   if (password.length < 6) { showRegError('Password minimal 6 karakter.'); return; }
   if (password !== password2) { showRegError('Konfirmasi password tidak cocok.'); return; }
 
-  const users = allUsers();
-  if (users.includes(username)) {
-    showRegError('Username sudah dipakai. Pilih username lain.');
-    return;
-  }
+  // Cek ke Firebase apakah username sudah ada
+  checkUserExistsAsync(username, exists => {
+    if (exists) {
+      showRegError('Username sudah dipakai. Pilih username lain.');
+      return;
+    }
 
-  users.push(username);
-  saveUsers(users);
-  saveUserPassword(username, password);
-  login(username);
+    const uid  = makeUID(username);
+    const hash = simpleHash(username + ':' + password);
+
+    // Buat profil user baru di Firebase
+    withDB(db => {
+      const newUserData = {
+        profile: {
+          username:   username,
+          created_at: new Date().toISOString(),
+        },
+        password_hash: hash,
+        saldo_awal:    0,
+        investasi_awal:0,
+      };
+      window.__fbSet(window.__fbRef(db, fbPath.user(uid)), newUserData)
+        .then(() => {
+          // Simpan mapping username → uid untuk lookup login
+          return window.__fbSet(window.__fbRef(db, `username_to_uid/${username}`), uid);
+        })
+        .then(() => {
+          // Update cache lokal
+          const users = allUsers();
+          users.push(username);
+          saveUsers(users);
+          try { localStorage.setItem(`dompet_pw_${username}`, hash); } catch(e) {}
+          login(username);
+        })
+        .catch(err => {
+          console.error('Gagal register ke Firebase:', err);
+          showRegError('Gagal membuat akun. Coba lagi atau periksa koneksi internet.');
+        });
+    });
+  });
 }
 
 function renderLoginUserList() {
@@ -1702,29 +1873,38 @@ function createUser() {
 function deleteUser(e, name) {
   e.stopPropagation();
   if (!confirm(`Hapus akun "${name}" beserta semua datanya?`)) return;
+  const uid   = makeUID(name);
   const users = allUsers().filter(u => u !== name);
   saveUsers(users);
+  // Hapus dari localStorage
   ['txs','saldo_awal','investasi_awal','last_ym'].forEach(k => {
     try { localStorage.removeItem(`dompet_u_${name}_${k}`); } catch(e) {}
   });
   try { localStorage.removeItem(`dompet_pw_${name}`); } catch(e) {}
+  // Hapus dari Firebase
+  withDB(db => {
+    window.__fbRemove(window.__fbRef(db, fbPath.user(uid))).catch(console.error);
+    window.__fbRemove(window.__fbRef(db, `username_to_uid/${name}`)).catch(console.error);
+  });
 }
 
 function login(name) {
   currentUser = name;
+  currentUID  = makeUID(name);
   loadUserData();
   // Update sidebar
   const initials = name.slice(0,2).toUpperCase();
   document.getElementById('sidebarAvatar').textContent = initials;
   document.getElementById('sidebarName').textContent = name;
   document.getElementById('loginScreen').classList.add('hidden');
-  renderDash();
+  // renderDash() dipanggil di dalam loadUserData setelah data Firebase dimuat
 }
 
 function logout() {
   if (!confirm('Keluar dari akun ini?')) return;
   saveData();
   currentUser = null;
+  currentUID  = null;
   txs = [];
   saldoAwal = 0;
   investasiAwal = 0;
@@ -1732,37 +1912,113 @@ function logout() {
   showPanel('login');
 }
 
-/* ─── PER-USER DATA PERSISTENCE ─────────────── */
+/* ─── PER-USER DATA PERSISTENCE — FIREBASE ───── */
+
+/* ─── saveData: simpan semua data user ke Firebase + cache lokal ─── */
 function saveData() {
-  if (!currentUser) return;
+  if (!currentUser || !currentUID) return;
+
+  // Cache lokal dulu (agar offline tetap bisa pakai)
   try { localStorage.setItem(uk('txs'), JSON.stringify(txs)); } catch(e) {}
   try { localStorage.setItem(uk('saldo_awal'), String(saldoAwal)); } catch(e) {}
   try { localStorage.setItem(uk('investasi_awal'), String(investasiAwal)); } catch(e) {}
+
+  // Simpan ke Firebase
+  withDB(db => {
+    const updates = {};
+    updates[fbPath.saldo(currentUID)]     = saldoAwal;
+    updates[fbPath.investasi(currentUID)] = investasiAwal;
+    window.__fbUpdate(window.__fbRef(db), updates).catch(console.error);
+  });
 }
 
+/* ─── saveTxToFirebase: simpan satu transaksi ke Firebase ─── */
+function saveTxToFirebase(tx) {
+  if (!currentUID) return;
+  withDB(db => {
+    window.__fbSet(
+      window.__fbRef(db, fbPath.tx(currentUID, String(tx.id))),
+      tx
+    ).catch(console.error);
+  });
+}
+
+/* ─── deleteTxFromFirebase: hapus satu transaksi dari Firebase ─── */
+function deleteTxFromFirebase(txId) {
+  if (!currentUID) return;
+  withDB(db => {
+    window.__fbRemove(window.__fbRef(db, fbPath.tx(currentUID, String(txId)))).catch(console.error);
+  });
+}
+
+/* ─── loadUserData: muat data dari Firebase (dengan fallback localStorage) ─── */
 function loadUserData() {
-  if (!currentUser) return;
-  // txs
-  try {
-    const saved = localStorage.getItem(uk('txs'));
-    txs = saved ? JSON.parse(saved) : [];
-  } catch(e) { txs = []; }
-  // saldo awal
-  try {
-    const saved = localStorage.getItem(uk('saldo_awal'));
-    saldoAwal = saved !== null ? parseFloat(saved) || 0 : 0;
-    const el = document.getElementById('saldoAwalInput');
-    if (el) el.value = saldoAwal || '';
-  } catch(e) { saldoAwal = 0; }
-  // investasi awal
-  try {
-    const saved = localStorage.getItem(uk('investasi_awal'));
-    investasiAwal = saved !== null ? parseFloat(saved) || 0 : 0;
-    const el = document.getElementById('investasiAwalInput');
-    if (el) el.value = investasiAwal ? investasiAwal.toLocaleString('id-ID') : '';
-  } catch(e) { investasiAwal = 0; }
-  // rollover check
-  autoRollover();
+  if (!currentUser || !currentUID) return;
+
+  // Tampilkan loading state sementara
+  txs = []; saldoAwal = 0; investasiAwal = 0;
+
+  withDB(db => {
+    window.__fbGet(window.__fbRef(db, fbPath.user(currentUID)))
+      .then(snap => {
+        if (snap.exists()) {
+          const data = snap.val();
+          // saldo & investasi awal
+          saldoAwal     = parseFloat(data.saldo_awal)     || 0;
+          investasiAwal = parseFloat(data.investasi_awal) || 0;
+          // transaksi: Firebase simpan sebagai object, konversi ke array
+          if (data.transactions) {
+            txs = Object.values(data.transactions)
+              .sort((a, b) => b.id - a.id); // newest first
+          } else {
+            txs = [];
+          }
+          // last_ym untuk rollover
+          if (data.last_ym) {
+            try { localStorage.setItem(uk('last_ym'), data.last_ym); } catch(e) {}
+          }
+        } else {
+          // User baru, tidak ada data
+          txs = []; saldoAwal = 0; investasiAwal = 0;
+        }
+
+        // Update cache lokal
+        try { localStorage.setItem(uk('txs'), JSON.stringify(txs)); } catch(e) {}
+        try { localStorage.setItem(uk('saldo_awal'), String(saldoAwal)); } catch(e) {}
+        try { localStorage.setItem(uk('investasi_awal'), String(investasiAwal)); } catch(e) {}
+
+        // Update UI
+        const elS = document.getElementById('saldoAwalInput');
+        if (elS) elS.value = saldoAwal || '';
+        const elI = document.getElementById('investasiAwalInput');
+        if (elI) elI.value = investasiAwal ? investasiAwal.toLocaleString('id-ID') : '';
+
+        autoRollover();
+        renderDash();
+      })
+      .catch(err => {
+        console.warn('Firebase offline — pakai cache lokal', err);
+        // Fallback ke localStorage jika offline
+        try {
+          const saved = localStorage.getItem(uk('txs'));
+          txs = saved ? JSON.parse(saved) : [];
+        } catch(e) { txs = []; }
+        try {
+          const saved = localStorage.getItem(uk('saldo_awal'));
+          saldoAwal = saved !== null ? parseFloat(saved) || 0 : 0;
+        } catch(e) { saldoAwal = 0; }
+        try {
+          const saved = localStorage.getItem(uk('investasi_awal'));
+          investasiAwal = saved !== null ? parseFloat(saved) || 0 : 0;
+        } catch(e) { investasiAwal = 0; }
+        const elS = document.getElementById('saldoAwalInput');
+        if (elS) elS.value = saldoAwal || '';
+        const elI = document.getElementById('investasiAwalInput');
+        if (elI) elI.value = investasiAwal ? investasiAwal.toLocaleString('id-ID') : '';
+        autoRollover();
+        renderDash();
+      });
+  });
 }
 
 /* ─── DATA ─── */
@@ -1936,7 +2192,7 @@ function autoRollover() {
 
     if (!alreadyAdded) {
       const firstOfMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
-      txs.unshift({
+      const rolloverTx = {
         id: Date.now(),
         name: 'Rollover Sisa Saldo',
         cat: 'Lainnya',
@@ -1944,13 +2200,21 @@ function autoRollover() {
         date: firstOfMonth,
         type: 'in',
         note: rolloverNote
-      });
+      };
+      txs.unshift(rolloverTx);
+      saveTxToFirebase(rolloverTx); // sync ke Firebase
       saveData();
       showToast(`Sisa saldo ${rp(sisaSebelumnya)} masuk sebagai pemasukan bulan ini`);
     }
   }
 
+  // Simpan last_ym ke localStorage + Firebase
   try { localStorage.setItem(uk('last_ym'), thisYM); } catch(e) {}
+  if (currentUID) {
+    withDB(db => {
+      window.__fbSet(window.__fbRef(db, fbPath.lastYM(currentUID)), thisYM).catch(console.error);
+    });
+  }
 }
 
 /* ─── DASHBOARD ─── */
@@ -2282,7 +2546,7 @@ function submitTarik() {
   }
 
   // Catat sebagai pemasukan (masuk ke sisa saldo)
-  txs.unshift({
+  const tarikTx = {
     id: Date.now(),
     name: 'Tarik Dana Investasi',
     cat: 'Investasi',
@@ -2290,7 +2554,10 @@ function submitTarik() {
     date,
     type: 'in',
     note: note || `Penarikan dari investasi`
-  });
+  };
+  txs.unshift(tarikTx);
+  saveTxToFirebase(tarikTx); // sync ke Firebase
+  try { localStorage.setItem(uk('txs'), JSON.stringify(txs)); } catch(e) {}
 
   closeTarikModal();
   saveData();
@@ -2430,8 +2697,13 @@ function submitTx() {
 }
 
 function doSaveTx(name, cat, amt, date, type, note) {
-  txs.unshift({id: Date.now(), name, cat, amount: amt, date, type, note});
-  saveData();
+  const tx = {id: Date.now(), name, cat, amount: amt, date, type, note};
+  txs.unshift(tx);
+  // Simpan ke Firebase (hanya transaksi baru, bukan seluruh array)
+  saveTxToFirebase(tx);
+  saveData(); // saldo & investasi awal (bukan txs array)
+  // Update cache txs lokal
+  try { localStorage.setItem(uk('txs'), JSON.stringify(txs)); } catch(e) {}
   closeModal();
   ['fName','fAmt','fNote'].forEach(id => document.getElementById(id).value = '');
   if (curPage === 'dashboard') renderDash();
@@ -2471,7 +2743,7 @@ function saveSaldoAwal() {
     showToast('Masukkan nominal yang valid', 'err'); return;
   }
   saldoAwal = val;
-  saveData();
+  saveData(); // sync ke Firebase
   try { localStorage.setItem(uk('saldo_awal'), val); } catch(e) {}
   renderDash();
   showToast('Saldo awal berhasil disimpan!');
@@ -2484,7 +2756,17 @@ function loadSaldoAwal() {
 
 function clearAll() {
   if(confirm('Hapus semua transaksi? Tidak dapat dibatalkan.')) {
-    txs=[]; saveData(); renderDash(); showToast('Semua transaksi dihapus');
+    txs=[];
+    // Hapus dari Firebase
+    if (currentUID) {
+      withDB(db => {
+        window.__fbRemove(window.__fbRef(db, fbPath.txs(currentUID))).catch(console.error);
+      });
+    }
+    // Cache lokal
+    try { localStorage.setItem(uk('txs'), JSON.stringify([])); } catch(e) {}
+    renderDash();
+    showToast('Semua transaksi dihapus');
   }
 }
 
