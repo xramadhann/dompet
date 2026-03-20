@@ -2,7 +2,6 @@
 .env
 .env.local
 .env.*.local
-js/env.js
 
 # Dependencies
 node_modules/
