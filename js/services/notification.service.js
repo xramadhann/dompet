@@ -164,7 +164,7 @@ export function checkAndNotifyThreshold(uid, totalIncome, totalExpense) {
 }
 
 // ── Notif konfirmasi setelah catat transaksi ───────────────────
-export function notifyTransactionSaved(tx) {
+export async function notifyTransactionSaved(tx) {
   if (Notification.permission !== "granted") return;
 
   const isIn  = tx.type === "in";
@@ -173,10 +173,20 @@ export function notifyTransactionSaved(tx) {
   const sign  = isIn ? "+" : "-";
   const amt   = tx.amount.toLocaleString("id-ID");
 
-  new Notification(`${emoji} ${label} dicatat!`, {
-    body: `${tx.name} · ${sign}Rp ${amt}`,
-    icon: "/icon-192.png",
-    badge: "/icon-192.png",
-    vibrate: [100],
-  });
+  const title = `${emoji} ${label} dicatat!`;
+  const body  = `${tx.name} · ${sign}Rp ${amt}`;
+
+  try {
+    // Pakai SW showNotification supaya works di PWA & background
+    const swReg = await navigator.serviceWorker.ready;
+    await swReg.showNotification(title, {
+      body,
+      icon:    "/icon-192.png",
+      badge:   "/icon-192.png",
+      vibrate: [100],
+    });
+  } catch {
+    // Fallback ke Notification API biasa
+    new Notification(title, { body, icon: "/icon-192.png" });
+  }
 }
