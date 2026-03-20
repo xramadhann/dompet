@@ -36,18 +36,33 @@ export async function requestNotifPermission(uid) {
       return null;
     }
 
-    // Daftarkan service worker
+    // Daftarkan service worker dan tunggu sampai aktif
     const swReg = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
+
+    // Tunggu SW benar-benar aktif sebelum minta token
+    await new Promise(resolve => {
+      if (swReg.active) { resolve(); return; }
+      const sw = swReg.installing ?? swReg.waiting;
+      if (sw) {
+        sw.addEventListener("statechange", e => {
+          if (e.target.state === "activated") resolve();
+        });
+      } else {
+        // SW sudah ada sebelumnya, langsung resolve
+        navigator.serviceWorker.ready.then(() => resolve());
+      }
+    });
 
     // Ambil FCM token
     const token = await getToken(_messaging, {
       vapidKey:           ENV.firebase.vapidKey,
       serviceWorkerRegistration: swReg,
     });
-    console.log("FCM TOKEN:", token); // ← tambah ini sementara
-
 
     if (!token) return null;
+
+    // LOG TOKEN untuk testing — hapus setelah konfirmasi works
+    console.log("%cFCM TOKEN:", "color:green;font-weight:bold", token);
 
     // Simpan token ke Firebase
     await _saveToken(uid, token);
@@ -146,7 +161,5 @@ export function checkAndNotifyThreshold(uid, totalIncome, totalExpense) {
     if (uid) {
       set(ref(db, `users/${uid}/notif_sent/${today}_${t.pct}`), true).catch(console.warn);
     }
-    
   }
-  
 }

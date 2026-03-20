@@ -1,23 +1,22 @@
 // public/firebase-messaging-sw.js
-// Service Worker untuk FCM — config harus hardcode karena SW
-// tidak bisa akses import.meta.env (di luar Vite bundle)
+// Config di-inject otomatis oleh Vite saat build (vite.config.js)
+// Placeholder __VITE_*__ diganti dengan nilai dari .env
 
 importScripts("https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js");
 importScripts("https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js");
 
 firebase.initializeApp({
-  apiKey:            "AIzaSyDo3jwhd4Nz339HDdZdo32ArWWjUHh-Q4M",
-  authDomain:        "dompet-64e72.firebaseapp.com",
-  databaseURL:       "https://dompet-64e72-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId:         "dompet-64e72",
-  storageBucket:     "dompet-64e72.firebasestorage.app",
-  messagingSenderId: "272498971576",
-  appId:             "1:272498971576:web:620874bd0989002ce5354d",
+  apiKey:            "__VITE_FIREBASE_API_KEY__",
+  authDomain:        "__VITE_FIREBASE_AUTH_DOMAIN__",
+  databaseURL:       "__VITE_FIREBASE_DATABASE_URL__",
+  projectId:         "__VITE_FIREBASE_PROJECT_ID__",
+  storageBucket:     "__VITE_FIREBASE_STORAGE_BUCKET__",
+  messagingSenderId: "__VITE_FIREBASE_MESSAGING_SENDER_ID__",
+  appId:             "__VITE_FIREBASE_APP_ID__",
 });
 
 const messaging = firebase.messaging();
 
-// Handle notif saat app di background / browser tutup
 messaging.onBackgroundMessage(payload => {
   const { title, body, icon } = payload.notification ?? {};
   self.registration.showNotification(title ?? "Dompet", {
@@ -29,7 +28,6 @@ messaging.onBackgroundMessage(payload => {
   });
 });
 
-// Klik notif → buka / fokus tab app
 self.addEventListener("notificationclick", event => {
   event.notification.close();
   event.waitUntil(
