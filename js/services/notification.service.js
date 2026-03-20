@@ -163,3 +163,21 @@ export function checkAndNotifyThreshold(uid, totalIncome, totalExpense) {
     }
   }
 }
+
+// ── Notif konfirmasi setelah catat transaksi ───────────────────
+export function notifyTransactionSaved(tx) {
+  if (Notification.permission !== "granted") return;
+
+  const isIn  = tx.type === "in";
+  const emoji = isIn ? "💰" : "💸";
+  const label = isIn ? "Pemasukan" : "Pengeluaran";
+  const sign  = isIn ? "+" : "-";
+  const amt   = tx.amount.toLocaleString("id-ID");
+
+  new Notification(`${emoji} ${label} dicatat!`, {
+    body: `${tx.name} · ${sign}Rp ${amt}`,
+    icon: "/icon-192.png",
+    badge: "/icon-192.png",
+    vibrate: [100],
+  });
+}

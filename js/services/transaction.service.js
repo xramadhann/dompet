@@ -7,7 +7,7 @@
  */
 
 import ENV from "../env.js";
-import { checkAndNotifyThreshold } from "./notification.service.js";
+import { checkAndNotifyThreshold, notifyTransactionSaved } from "./notification.service.js";
 import {
   saveTransaction,
   deleteTransaction,
@@ -109,6 +109,9 @@ export async function addTransaction({ name, cat, amount, date, type, note = "" 
   } catch (e) {
     console.warn("Firebase saveTransaction gagal (offline?):", e);
   }
+
+  // Notif konfirmasi transaksi tersimpan
+  notifyTransactionSaved(tx);
 
   // Cek threshold notif (hanya untuk pengeluaran, sekali per hari per threshold)
   if (type === "out") {
