@@ -61,12 +61,7 @@ export async function requestNotifPermission(uid) {
 
     if (!token) return null;
 
-    // LOG TOKEN untuk testing — hapus setelah konfirmasi works
-    console.log("%cFCM TOKEN:", "color:green;font-weight:bold", token);
-    // Tampilkan token di layar HP untuk debug
-    if (navigator.userAgent.includes("Mobile")) {
-      setTimeout(() => alert("FCM TOKEN (copy ini):" + token), 1000);
-    }
+
 
     // Simpan token ke Firebase
     await _saveToken(uid, token);
