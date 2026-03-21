@@ -531,3 +531,10 @@ select.form-input option { background:var(--white); }
   font-size: 13px; font-weight: 600;
   color: var(--ink2);
 }
+
+/* Disabled state saat loading */
+.btn:disabled {
+  pointer-events: none;
+  opacity: 0.55;
+  cursor: not-allowed;
+}
