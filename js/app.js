@@ -1,16 +1,10 @@
 /**
  * js/app.js
- * ─────────────────────────────────────────────────────────────
- * Entry point aplikasi. Mengorkestrasi:
- *   - Login / register flow
- *   - Navigasi antar halaman
- *   - Modal tambah transaksi & tarik dana
- *   - Dialog konfirmasi defisit
- * ─────────────────────────────────────────────────────────────
  */
 
 import { login as authLogin, register as authRegister, makeUID } from "./services/auth.service.js";
-import { loadUserData }   from "./services/firebase.service.js";
+import { loadUserData, _app } from "./services/firebase.service.js";
+import { initMessaging, requestNotifPermission } from "./services/notification.service.js";
 import {
   state, initState, resetState, addTransaction, tarikInvestasi,
   checkDefisit, clearAll as clearAllTx, exportCSV, getTotalInvestasi,
@@ -28,7 +22,6 @@ import {
   renderTrendChart, activeChartPeriod,
 } from "./ui.helpers.js";
 
-// ── Current page ───────────────────────────────────────────────
 let curPage = "dashboard";
 let txType  = "out";
 
@@ -79,8 +72,11 @@ window.openModal = () => {
   document.getElementById("fNote").value = "";
   document.getElementById("modalWrap").classList.add("open");
 };
-window.closeModal = () => document.getElementById("modalWrap").classList.remove("open");
-window.setTxType  = t => {
+window.closeModal = () => {
+  document.getElementById("modalWrap").classList.remove("open");
+  _setModalLoading(false);
+};
+window.setTxType = t => {
   txType = t;
   document.getElementById("tOut").className = "type-opt" + (t === "out" ? " sel-out" : "");
   document.getElementById("tIn").className  = "type-opt" + (t === "in"  ? " sel-in"  : "");
@@ -115,20 +111,28 @@ window.submitTx = async () => {
 
   const payload = { name, cat, amount: amt, date, type: txType, note };
 
-  // Cek defisit dulu
   if (txType === "out") {
     const defisit = checkDefisit(amt);
-    if (defisit) {
-      showDefisitDialog(defisit, payload);
-      return;
-    }
+    if (defisit) { showDefisitDialog(defisit, payload); return; }
   }
 
   await _doSaveTx(payload);
 };
 
+// ── Loading state ──────────────────────────────────────────────
+function _setModalLoading(on) {
+  const overlay  = document.getElementById("modalLoadingOverlay");
+  const btn      = document.getElementById("btnSimpan");
+  const btnBatal = btn?.previousElementSibling;
+  if (overlay) overlay.classList.toggle("show", on);
+  if (btn)     { btn.classList.toggle("btn-loading", on); btn.disabled = on; }
+  if (btnBatal) btnBatal.disabled = on;
+}
+
 async function _doSaveTx(payload) {
+  _setModalLoading(true);
   const result = await addTransaction(payload);
+  _setModalLoading(false);
   if (!result.success) { showToast(result.error, "err"); return; }
   closeModal();
   _refreshCurrentPage();
@@ -157,7 +161,7 @@ function showDefisitDialog({ sisaSaldo, defisitSetelah }, payload) {
 }
 window.closeAlertDefisit = () => document.getElementById("alertDefisitWrap").classList.remove("open");
 window.confirmDefisit    = async () => {
-  closeModal();
+  window.closeModal();
   window.closeAlertDefisit();
   if (_defisitPayload) { await _doSaveTx(_defisitPayload); _defisitPayload = null; }
 };
@@ -194,7 +198,7 @@ window.submitTarik = async () => {
   showToast(`${rpFull(amt)} berhasil ditarik dari investasi!`);
 };
 
-// ── Filter & sort wiring ───────────────────────────────────────
+// ── Filter & sort ──────────────────────────────────────────────
 window.setFType = el => {
   document.querySelectorAll("#filterBar [data-ft]").forEach(e => e.classList.remove("on"));
   el.classList.add("on");
@@ -206,7 +210,7 @@ window.setFCat = el => {
   setFCat(el.dataset.fc);
 };
 
-// ── Pengaturan wiring ──────────────────────────────────────────
+// ── Pengaturan ─────────────────────────────────────────────────
 window.previewSaldo      = previewSaldo;
 window.previewInvestasi  = previewInvestasi;
 window.saveSaldoAwal     = saveSaldoAwal;
@@ -218,21 +222,13 @@ window.clearAll          = async () => {
   _refreshCurrentPage();
   showToast("Semua transaksi dihapus");
 };
-window.exportCSV = exportCSV;
-
-// ── Format input wiring ────────────────────────────────────────
-window.formatAmtInput = formatAmtInput;
-window.formatInvInput = formatAmtInput;
+window.exportCSV        = exportCSV;
+window.formatAmtInput   = formatAmtInput;
+window.formatInvInput   = formatAmtInput;
 window.formatTarikInput = formatAmtInput;
-
-// ── Laporan wiring ─────────────────────────────────────────────
-window.shiftMonth = shiftMonth;
-
-// ── Toggle password ────────────────────────────────────────────
-window.togglePw = togglePw;
-
-// ── Render tx page on search/sort ─────────────────────────────
-window.renderTxPage = renderTxPage;
+window.shiftMonth       = shiftMonth;
+window.togglePw         = togglePw;
+window.renderTxPage     = renderTxPage;
 
 // ── Login / register ───────────────────────────────────────────
 window.showPanel = panel => {
@@ -242,23 +238,16 @@ window.showPanel = panel => {
   document.getElementById("regError").style.display      = "none";
   ["loginUsername","loginPassword","regUsername","regPassword","regPassword2"]
     .forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
-  const focus = panel === "login" ? "loginUsername" : "regUsername";
-  document.getElementById(focus)?.focus();
+  document.getElementById(panel === "login" ? "loginUsername" : "regUsername")?.focus();
 };
 
 window.doLogin = async () => {
   const username = document.getElementById("loginUsername").value.trim();
   const password = document.getElementById("loginPassword").value;
   document.getElementById("loginError").style.display = "none";
-
-  const _showErr = msg => {
-    const el = document.getElementById("loginError");
-    el.textContent = msg; el.style.display = "";
-  };
-
+  const _showErr = msg => { const el = document.getElementById("loginError"); el.textContent = msg; el.style.display = ""; };
   const result = await authLogin(username, password);
   if (!result.success) { _showErr(result.error); return; }
-
   await _loginSuccess(username, result.uid);
 };
 
@@ -267,40 +256,33 @@ window.doRegister = async () => {
   const password  = document.getElementById("regPassword").value;
   const password2 = document.getElementById("regPassword2").value;
   document.getElementById("regError").style.display = "none";
-
-  const _showErr = msg => {
-    const el = document.getElementById("regError");
-    el.textContent = msg; el.style.display = "";
-  };
-
+  const _showErr = msg => { const el = document.getElementById("regError"); el.textContent = msg; el.style.display = ""; };
   const result = await authRegister(username, password, password2);
   if (!result.success) { _showErr(result.error); return; }
-
   await _loginSuccess(username, result.uid);
 };
 
 async function _loginSuccess(username, uid) {
-  // Simpan session biar tidak balik ke login pas refresh
   localStorage.setItem("dompet_session", JSON.stringify({ username, uid }));
 
-  // Muat data dari Firebase
   let data;
   try {
     data = await loadUserData(uid);
   } catch {
-    // Offline fallback
     const { loadFromCache } = await import("./services/transaction.service.js");
     data = loadFromCache(username);
   }
 
   initState(uid, username, data);
 
-  // Update sidebar
   document.getElementById("sidebarAvatar").textContent = username.slice(0, 2).toUpperCase();
   document.getElementById("sidebarName").textContent   = username;
   document.getElementById("loginScreen").classList.add("hidden");
 
-  // Render halaman awal
+  // Init push notifikasi
+  initMessaging(_app);
+  requestNotifPermission(uid).catch(console.warn);
+
   window.goTo("dashboard", null);
 }
 
@@ -312,7 +294,7 @@ window.logout = () => {
   window.showPanel("login");
 };
 
-// ── Scrim / modal click-outside ────────────────────────────────
+// ── Click outside modals ───────────────────────────────────────
 document.getElementById("alertDefisitWrap")?.addEventListener("click", e => {
   if (e.target === e.currentTarget) window.closeAlertDefisit();
 });
@@ -323,14 +305,13 @@ document.getElementById("tarikModalWrap")?.addEventListener("click", e => {
   if (e.target === e.currentTarget) window.closeTarikModal();
 });
 
-// ── Bootstrap — restore session kalau ada ─────────────────────
+// ── Bootstrap ──────────────────────────────────────────────────
 (async () => {
   try {
     const raw = localStorage.getItem("dompet_session");
     if (raw) {
       const { username, uid } = JSON.parse(raw);
       if (username && uid) {
-        // Langsung masuk tanpa perlu login ulang
         await _loginSuccess(username, uid);
         return;
       }
@@ -338,6 +319,6 @@ document.getElementById("tarikModalWrap")?.addEventListener("click", e => {
   } catch {
     localStorage.removeItem("dompet_session");
   }
-  // Tidak ada session — tampilkan login
+  document.getElementById("loginScreen").classList.remove("hidden");
   window.showPanel("login");
 })();
