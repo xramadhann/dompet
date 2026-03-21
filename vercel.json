@@ -16,5 +16,9 @@
         { "key": "Cache-Control", "value": "no-cache" }
       ]
     }
+  ],
+  "rewrites": [
+    { "source": "/api/notify-morning",   "destination": "/api/notify-morning.cjs" },
+    { "source": "/api/notify-threshold", "destination": "/api/notify-threshold.cjs" }
   ]
 }

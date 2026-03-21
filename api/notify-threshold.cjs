@@ -1,7 +1,4 @@
-// api/notify-threshold.js
-// Vercel Serverless Function — dipanggil dari client setiap tambah transaksi
-// Cek threshold 50/75/90/100% dan kirim push ke semua device user
-
+// api/notify-threshold.cjs
 const admin = require("firebase-admin");
 
 if (!admin.apps.length) {
@@ -19,48 +16,28 @@ const db        = admin.database();
 const messaging = admin.messaging();
 
 const THRESHOLDS = [
-  {
-    pct:   50,
-    title: "💸 Setengah Budget Terpakai",
-    body:  "Pengeluaran bulan ini sudah 50% dari pemasukan, jangan boros-boros ya!",
-  },
-  {
-    pct:   75,
-    title: "⚠️ Budget Sudah 75%!",
-    body:  "Pengeluaran bulan ini sudah 75% dari pemasukan, mulai hemat ya!",
-  },
-  {
-    pct:   90,
-    title: "🚨 Budget Hampir Habis!",
-    body:  "Pengeluaran bulan ini sudah 90% dari pemasukan, hati-hati!",
-  },
-  {
-    pct:   100,
-    title: "🔴 Budget Habis!",
-    body:  "Pengeluaran bulan ini sudah 100% dari pemasukan, kamu defisit!",
-  },
+  { pct: 50,  title: "💸 Setengah Budget Terpakai", body: "Pengeluaran bulan ini sudah 50% dari pemasukan, jangan boros-boros ya!" },
+  { pct: 75,  title: "⚠️ Budget Sudah 75%!",        body: "Pengeluaran bulan ini sudah 75% dari pemasukan, mulai hemat ya!" },
+  { pct: 90,  title: "🚨 Budget Hampir Habis!",     body: "Pengeluaran bulan ini sudah 90% dari pemasukan, hati-hati!" },
+  { pct: 100, title: "🔴 Budget Habis!",             body: "Pengeluaran bulan ini sudah 100% dari pemasukan, kamu defisit!" },
 ];
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   const { uid, totalIncome, totalExpense } = req.body;
-  if (!uid || !totalIncome || !totalExpense) {
+  if (!uid || !totalIncome || totalExpense === undefined) {
     return res.status(400).json({ error: "Missing params" });
   }
 
   const pct   = Math.round((totalExpense / totalIncome) * 100);
-  const today = new Date().toISOString().slice(0, 7); // YYYY-MM
+  const today = new Date().toISOString().slice(0, 7);
 
   try {
-    // Ambil tokens user
     const tokensSnap = await db.ref(`users/${uid}/fcm_tokens`).get();
     if (!tokensSnap.exists()) return res.json({ sent: 0 });
 
-    const tokens = Object.values(tokensSnap.val())
-      .map(t => t.token)
-      .filter(Boolean);
-
+    const tokens = Object.values(tokensSnap.val()).map(t => t.token).filter(Boolean);
     if (!tokens.length) return res.json({ sent: 0 });
 
     let totalSent = 0;
@@ -68,12 +45,10 @@ export default async function handler(req, res) {
     for (const t of THRESHOLDS) {
       if (pct < t.pct) continue;
 
-      // Cek apakah notif threshold ini sudah dikirim bulan ini
       const flagKey  = `${today}_${t.pct}`;
       const flagSnap = await db.ref(`users/${uid}/notif_sent/${flagKey}`).get();
       if (flagSnap.exists()) continue;
 
-      // Kirim push ke semua device
       const result = await messaging.sendEachForMulticast({
         tokens,
         notification: { title: t.title, body: t.body },
@@ -88,11 +63,8 @@ export default async function handler(req, res) {
       });
 
       totalSent += result.successCount;
-
-      // Tandai sudah dikirim bulan ini
       await db.ref(`users/${uid}/notif_sent/${flagKey}`).set(true);
 
-      // Hapus token expired
       result.responses.forEach((r, i) => {
         if (!r.success && r.error?.code === "messaging/registration-token-not-registered") {
           const key = tokens[i].replace(/[.#$[\]]/g, "_").slice(0, 100);
@@ -106,4 +78,4 @@ export default async function handler(req, res) {
     console.error("Error:", e);
     return res.status(500).json({ error: e.message });
   }
-}
+};
