@@ -4,7 +4,7 @@
   "installCommand": "npm install",
   "crons": [
     {
-      "path": "/api/notify-morning.cjs",
+      "path": "/api/notify-morning",
       "schedule": "0 1 * * *"
     }
   ],

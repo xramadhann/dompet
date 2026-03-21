@@ -119,7 +119,7 @@ export async function checkAndNotifyThreshold(uid, totalIncome, totalExpense) {
 
   try {
     // Panggil Vercel API — kirim push ke semua device user
-    await fetch("/api/notify-threshold.cjs", {
+    await fetch("/api/notify-threshold", {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
       body:    JSON.stringify({ uid, totalIncome, totalExpense }),
