@@ -31,6 +31,7 @@ export async function requestNotifPermission(uid) {
 
   try {
     const permission = await Notification.requestPermission();
+    console.log("[FCM] Permission:", permission);
     if (permission !== "granted") {
       console.log("Notifikasi ditolak user.");
       return null;
@@ -58,6 +59,7 @@ export async function requestNotifPermission(uid) {
       vapidKey:                  ENV.firebase.vapidKey,
       serviceWorkerRegistration: swReg,
     });
+    console.log("[FCM] Token:", token ? token.slice(0,20)+"..." : "null");
 
     if (!token) return null;
 
@@ -71,7 +73,7 @@ export async function requestNotifPermission(uid) {
 
     return token;
   } catch (e) {
-    console.error("Gagal daftar FCM:", e);
+    console.error("[FCM] Gagal daftar FCM:", e.message, e);
     return null;
   }
 }
