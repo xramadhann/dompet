@@ -10,8 +10,7 @@
  */
 
 import { login as authLogin, register as authRegister, makeUID } from "./services/auth.service.js";
-import { loadUserData, _app } from "./services/firebase.service.js";
-import { initMessaging, requestNotifPermission, checkAndNotifyThreshold } from "./services/notification.service.js";
+import { loadUserData }   from "./services/firebase.service.js";
 import {
   state, initState, resetState, addTransaction, tarikInvestasi,
   checkDefisit, clearAll as clearAllTx, exportCSV, getTotalInvestasi,
@@ -80,7 +79,7 @@ window.openModal = () => {
   document.getElementById("fNote").value = "";
   document.getElementById("modalWrap").classList.add("open");
 };
-window.closeModal = () => { document.getElementById("modalWrap").classList.remove("open"); _setModalLoading(false); };
+window.closeModal = () => document.getElementById("modalWrap").classList.remove("open");
 window.setTxType  = t => {
   txType = t;
   document.getElementById("tOut").className = "type-opt" + (t === "out" ? " sel-out" : "");
@@ -128,17 +127,8 @@ window.submitTx = async () => {
   await _doSaveTx(payload);
 };
 
-function _setModalLoading(on) {
-  const overlay = document.getElementById("modalLoadingOverlay");
-  const btn     = document.getElementById("btnSimpan");
-  if (overlay) overlay.classList.toggle("show", on);
-  if (btn)     btn.classList.toggle("btn-loading", on);
-}
-
 async function _doSaveTx(payload) {
-  _setModalLoading(true);
   const result = await addTransaction(payload);
-  _setModalLoading(false);
   if (!result.success) { showToast(result.error, "err"); return; }
   closeModal();
   _refreshCurrentPage();
@@ -309,10 +299,6 @@ async function _loginSuccess(username, uid) {
   document.getElementById("sidebarAvatar").textContent = username.slice(0, 2).toUpperCase();
   document.getElementById("sidebarName").textContent   = username;
   document.getElementById("loginScreen").classList.add("hidden");
-
-  // Init push notifikasi (tidak blocking)
-  initMessaging(_app);
-  requestNotifPermission(uid).catch(console.warn);
 
   // Render halaman awal
   window.goTo("dashboard", null);
