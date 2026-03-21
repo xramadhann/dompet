@@ -127,6 +127,16 @@ window.submitTx = async () => {
   await _doSaveTx(payload);
 };
 
+<<<<<<< HEAD
+=======
+function _setModalLoading(on) {
+  const overlay = document.getElementById("modalLoadingOverlay");
+  const btn     = document.getElementById("btnSimpan");
+  if (overlay) overlay.classList.toggle("show", on);
+  if (btn)     btn.classList.toggle("btn-loading", on);
+}
+
+>>>>>>> parent of 02faf2b (Update app.js)
 async function _doSaveTx(payload) {
   const result = await addTransaction(payload);
   if (!result.success) { showToast(result.error, "err"); return; }
