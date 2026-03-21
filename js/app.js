@@ -280,8 +280,15 @@ async function _loginSuccess(username, uid) {
   document.getElementById("loginScreen").classList.add("hidden");
 
   // Init push notifikasi
-  initMessaging(_app);
-  requestNotifPermission(uid).catch(console.warn);
+  console.log("[APP] Init messaging untuk uid:", uid);
+  try {
+    initMessaging(_app);
+    console.log("[APP] initMessaging OK");
+    const token = await requestNotifPermission(uid);
+    console.log("[APP] FCM token:", token ? token.slice(0,20)+"..." : "null");
+  } catch(e) {
+    console.error("[APP] FCM error:", e.message);
+  }
 
   window.goTo("dashboard", null);
 }
