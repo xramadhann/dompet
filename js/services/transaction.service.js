@@ -115,8 +115,15 @@ export async function addTransaction({ name, cat, amount, date, type, note = "" 
 
   // Cek threshold notif (hanya untuk pengeluaran, sekali per hari per threshold)
   if (type === "out") {
-    const totalInc = incSum(state.transactions);
-    const totalExp = expSum(state.transactions);
+    const now = new Date();
+    const monthTx = state.transactions.filter(t => {
+      const d = new Date(t.date);
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    });
+    const totalInc = incSum(monthTx);
+    const totalExp = expSum(monthTx);
+    const pct = totalInc > 0 ? Math.round(totalExp / totalInc * 100) : 0;
+    console.log();
     checkAndNotifyThreshold(state.uid, totalInc, totalExp);
   }
 
