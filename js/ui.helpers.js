@@ -171,3 +171,16 @@ export function renderTrendChart(period, txs, incSumFn, expSumFn, byMonthFn) {
     },
   });
 }
+
+// ── Skeleton HTML untuk loading state ─────────────────────────
+export function skeletonTxRows(count = 4) {
+  return Array.from({ length: count }, () => `
+    <div class="skeleton-row">
+      <div class="skeleton skeleton-ico"></div>
+      <div class="skeleton-body">
+        <div class="skeleton skeleton-line w-60"></div>
+        <div class="skeleton skeleton-line w-40"></div>
+      </div>
+      <div class="skeleton skeleton-amt"></div>
+    </div>`).join("");
+}
