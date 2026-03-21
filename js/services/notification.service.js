@@ -103,6 +103,8 @@ async function _saveToken(uid, token) {
     updated_at: new Date().toISOString(),
     platform,
   });
+  console.log("[FCM] Token saved, platform:", platform);
+  await _debugLog({ step: "token_saved", platform, tokenPrefix: token.slice(0, 20) });
 }
 
 // FCM token mengandung karakter : yang tidak valid sebagai Firebase key
