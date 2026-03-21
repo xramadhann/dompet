@@ -53,17 +53,15 @@ export async function requestNotifPermission(uid) {
       }
     });
 
-    // Ambil FCM token
+    // Ambil FCM token — selalu refresh supaya tidak expired setelah reinstall PWA
     const token = await getToken(_messaging, {
-      vapidKey:           ENV.firebase.vapidKey,
+      vapidKey:                  ENV.firebase.vapidKey,
       serviceWorkerRegistration: swReg,
     });
 
     if (!token) return null;
 
-
-
-    // Simpan token ke Firebase
+    // Simpan token ke Firebase (selalu update supaya token tidak expired)
     await _saveToken(uid, token);
 
     // Handle notif saat app foreground
@@ -80,8 +78,18 @@ export async function requestNotifPermission(uid) {
 
 // ── Simpan token ke RTDB ───────────────────────────────────────
 async function _saveToken(uid, token) {
-  // Simpan token dengan timestamp — satu user bisa punya banyak device
-  await set(ref(db, `users/${uid}/fcm_tokens/${_sanitizeKey(token)}`), {
+  const key = _sanitizeKey(token);
+  // Cek apakah token sudah tersimpan & masih fresh (< 7 hari)
+  try {
+    const existing = await get(ref(db, `users/${uid}/fcm_tokens/${key}`));
+    if (existing.exists()) {
+      const data = existing.val();
+      const age  = Date.now() - new Date(data.updated_at).getTime();
+      if (age < 7 * 24 * 60 * 60 * 1000) return; // masih fresh, skip
+    }
+  } catch {}
+  // Simpan / update token
+  await set(ref(db, `users/${uid}/fcm_tokens/${key}`), {
     token,
     updated_at: new Date().toISOString(),
     platform:   navigator.userAgent.includes("Mobile") ? "mobile" : "desktop",
