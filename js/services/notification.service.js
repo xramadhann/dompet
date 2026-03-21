@@ -25,15 +25,26 @@ export function initMessaging(firebaseApp) {
 }
 
 // ── Minta izin & daftarkan token ───────────────────────────────
+async function _debugLog(data) {
+  try {
+    await fetch("/api/debug-log", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...data, ua: navigator.userAgent.slice(0, 80), ts: new Date().toISOString() }),
+    });
+  } catch {}
+}
+
 export async function requestNotifPermission(uid) {
-  if (!_messaging) return null;
-  if (!("Notification" in window)) return null;
+  if (!_messaging) { _debugLog({ step: "no_messaging" }); return null; }
+  if (!("Notification" in window)) { _debugLog({ step: "no_notification_api" }); return null; }
 
   try {
     const permission = await Notification.requestPermission();
     console.log("[FCM] Permission:", permission);
+    await _debugLog({ step: "permission", permission });
     if (permission !== "granted") {
-      console.log("Notifikasi ditolak user.");
+      await _debugLog({ step: "permission_denied" });
       return null;
     }
 
@@ -60,6 +71,7 @@ export async function requestNotifPermission(uid) {
       serviceWorkerRegistration: swReg,
     });
     console.log("[FCM] Token:", token ? token.slice(0,20)+"..." : "null");
+    await _debugLog({ step: "token", hasToken: !!token, tokenPrefix: token?.slice(0,20) });
 
     if (!token) return null;
 
@@ -74,6 +86,7 @@ export async function requestNotifPermission(uid) {
     return token;
   } catch (e) {
     console.error("[FCM] Gagal daftar FCM:", e.message, e);
+    await _debugLog({ step: "error", error: e.message });
     return null;
   }
 }
