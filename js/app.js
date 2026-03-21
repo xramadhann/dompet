@@ -11,6 +11,7 @@
 
 import { login as authLogin, register as authRegister, makeUID } from "./services/auth.service.js";
 import { loadUserData }   from "./services/firebase.service.js";
+import { loadUserData, _app } from "./services/firebase.service.js";
 import {
   state, initState, resetState, addTransaction, tarikInvestasi,
   checkDefisit, clearAll as clearAllTx, exportCSV, getTotalInvestasi,
@@ -307,7 +308,7 @@ async function _loginSuccess(username, uid) {
   } catch(e) {
     console.warn("[FCM] Error:", e.message);
   }
-  
+
   // Render halaman awal
   window.goTo("dashboard", null);
 }
