@@ -110,8 +110,8 @@ export async function addTransaction({ name, cat, amount, date, type, note = "" 
     console.warn("Firebase saveTransaction gagal (offline?):", e);
   }
 
-  // Notif konfirmasi transaksi tersimpan
-  notifyTransactionSaved(tx);
+  // Notif konfirmasi transaksi tersimpan — kirim ke semua device
+  notifyTransactionSaved(state.uid, tx);
 
   // Cek threshold notif (hanya untuk pengeluaran, sekali per hari per threshold)
   if (type === "out") {
