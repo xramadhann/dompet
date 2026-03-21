@@ -4,7 +4,7 @@
   "installCommand": "npm install",
   "crons": [
     {
-      "path": "/api/notify-morning",
+      "path": "/api/notify-morning.cjs",
       "schedule": "0 1 * * *"
     }
   ],
@@ -16,9 +16,5 @@
         { "key": "Cache-Control", "value": "no-cache" }
       ]
     }
-  ],
-  "rewrites": [
-    { "source": "/api/notify-morning",   "destination": "/api/notify-morning.cjs" },
-    { "source": "/api/notify-threshold", "destination": "/api/notify-threshold.cjs" }
   ]
 }
