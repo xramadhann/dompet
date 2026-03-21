@@ -66,6 +66,9 @@ module.exports = async function handler(req, res) {
 
     let totalSent = 0;
 
+    // Delay 5 detik sebelum kirim notif
+    await new Promise(resolve => setTimeout(resolve, 5000));
+
     for (const t of THRESHOLDS) {
       if (pct < t.pct) continue;
 
