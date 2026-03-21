@@ -114,52 +114,18 @@ const THRESHOLD_KEYS = {
   100: "notif_threshold_100",
 };
 
-export function checkAndNotifyThreshold(uid, totalIncome, totalExpense) {
+export async function checkAndNotifyThreshold(uid, totalIncome, totalExpense) {
   if (!totalIncome || totalIncome <= 0) return;
 
-  const pct = Math.round((totalExpense / totalIncome) * 100);
-  const today = new Date().toISOString().slice(0, 7); // "YYYY-MM" — reset tiap bulan
-
-  const thresholds = [
-    {
-      pct: 50,
-      title: "💸 Setengah Budget Terpakai",
-      body:  "Pengeluaran kamu bulan ini sudah mencapai 50% dari pemasukan kamu nih, jangan boros-boros ya!",
-    },
-    {
-      pct: 90,
-      title: "⚠️ Budget Hampir Habis!",
-      body:  "Pengeluaran kamu bulan ini sudah mencapai 90% dari pemasukan kamu nih, jangan boros-boros ya!",
-    },
-    {
-      pct: 100,
-      title: "🚨 Budget Habis!",
-      body:  "Pengeluaran kamu bulan ini sudah mencapai 100% dari pemasukan kamu ya, hati-hati defisit!",
-    },
-  ];
-
-  for (const t of thresholds) {
-    if (pct < t.pct) continue;
-
-    const storageKey = `${THRESHOLD_KEYS[t.pct]}_${uid}_${today}`;
-    const alreadySent = localStorage.getItem(storageKey);
-    if (alreadySent) continue; // sudah dikirim bulan ini
-
-    // Tandai sudah dikirim
-    localStorage.setItem(storageKey, "1");
-
-    // Kirim notif lokal (foreground)
-    if (Notification.permission === "granted") {
-      new Notification(t.title, {
-        body: t.body,
-        icon: "/icon-192.png",
-      });
-    }
-
-    // Juga simpan flag ke Firebase supaya Cloud Function tidak kirim duplikat
-    if (uid) {
-      set(ref(db, `users/${uid}/notif_sent/${today}_${t.pct}`), true).catch(console.warn);
-    }
+  try {
+    // Panggil Vercel API — kirim push ke semua device user
+    await fetch("/api/notify-threshold", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ uid, totalIncome, totalExpense }),
+    });
+  } catch (e) {
+    console.warn("Gagal kirim threshold notif:", e);
   }
 }
 
@@ -177,16 +143,14 @@ export async function notifyTransactionSaved(tx) {
   const body  = `${tx.name} · ${sign}Rp ${amt}`;
 
   try {
-    // Pakai SW showNotification supaya works di PWA & background
     const swReg = await navigator.serviceWorker.ready;
     await swReg.showNotification(title, {
       body,
-      icon:    "/icon-192.png",
-      badge:   "/icon-192.png",
+      icon:    "https://dompet-five.vercel.app/icon-512.png",
+      badge:   "https://dompet-five.vercel.app/icon-512.png",
       vibrate: [100],
     });
   } catch {
-    // Fallback ke Notification API biasa
-    new Notification(title, { body, icon: "/icon-192.png" });
+    new Notification(title, { body, icon: "https://dompet-five.vercel.app/icon-512.png" });
   }
 }
