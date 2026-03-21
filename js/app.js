@@ -131,8 +131,14 @@ window.submitTx = async () => {
 function _setModalLoading(on) {
   const overlay = document.getElementById("modalLoadingOverlay");
   const btn     = document.getElementById("btnSimpan");
+  const btnBatal = btn?.previousElementSibling;
   if (overlay) overlay.classList.toggle("show", on);
-  if (btn)     btn.classList.toggle("btn-loading", on);
+  if (btn) {
+    btn.classList.toggle("btn-loading", on);
+    btn.disabled = on;
+  }
+  // Disable tombol Batal juga supaya tidak bisa close saat proses
+  if (btnBatal) btnBatal.disabled = on;
 }
 
 async function _doSaveTx(payload) {
