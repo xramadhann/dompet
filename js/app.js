@@ -80,7 +80,7 @@ window.openModal = () => {
   document.getElementById("fNote").value = "";
   document.getElementById("modalWrap").classList.add("open");
 };
-window.closeModal = () => document.getElementById("modalWrap").classList.remove("open");
+window.closeModal = () => { document.getElementById("modalWrap").classList.remove("open"); _setModalLoading(false); };
 window.setTxType  = t => {
   txType = t;
   document.getElementById("tOut").className = "type-opt" + (t === "out" ? " sel-out" : "");
@@ -128,8 +128,17 @@ window.submitTx = async () => {
   await _doSaveTx(payload);
 };
 
+function _setModalLoading(on) {
+  const overlay = document.getElementById("modalLoadingOverlay");
+  const btn     = document.getElementById("btnSimpan");
+  if (overlay) overlay.classList.toggle("show", on);
+  if (btn)     btn.classList.toggle("btn-loading", on);
+}
+
 async function _doSaveTx(payload) {
+  _setModalLoading(true);
   const result = await addTransaction(payload);
+  _setModalLoading(false);
   if (!result.success) { showToast(result.error, "err"); return; }
   closeModal();
   _refreshCurrentPage();
