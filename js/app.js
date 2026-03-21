@@ -300,6 +300,14 @@ async function _loginSuccess(username, uid) {
   document.getElementById("sidebarName").textContent   = username;
   document.getElementById("loginScreen").classList.add("hidden");
 
+    try {
+    const { initMessaging, requestNotifPermission } = await import("./services/notification.service.js");
+    initMessaging(_app);
+    await requestNotifPermission(uid);
+  } catch(e) {
+    console.warn("[FCM] Error:", e.message);
+  }
+  
   // Render halaman awal
   window.goTo("dashboard", null);
 }
