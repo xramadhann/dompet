@@ -123,8 +123,8 @@ export async function addTransaction({ name, cat, amount, date, type, note = "" 
     const totalInc = incSum(monthTx);
     const totalExp = expSum(monthTx);
     const pct = totalInc > 0 ? Math.round(totalExp / totalInc * 100) : 0;
-    console.log();
-    checkAndNotifyThreshold(state.uid, totalInc, totalExp);
+    console.log('[Threshold] inc:', totalInc, 'exp:', totalExp, 'pct:', pct + '%');
+    await checkAndNotifyThreshold(state.uid, totalInc, totalExp);
   }
 
   return { success: true, tx, defisit };
