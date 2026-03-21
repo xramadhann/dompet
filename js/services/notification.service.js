@@ -78,21 +78,15 @@ export async function requestNotifPermission(uid) {
 
 // ── Simpan token ke RTDB ───────────────────────────────────────
 async function _saveToken(uid, token) {
-  const key = _sanitizeKey(token);
-  // Cek apakah token sudah tersimpan & masih fresh (< 7 hari)
-  try {
-    const existing = await get(ref(db, `users/${uid}/fcm_tokens/${key}`));
-    if (existing.exists()) {
-      const data = existing.val();
-      const age  = Date.now() - new Date(data.updated_at).getTime();
-      if (age < 7 * 24 * 60 * 60 * 1000) return; // masih fresh, skip
-    }
-  } catch {}
-  // Simpan / update token
+  const key      = _sanitizeKey(token);
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const platform = isMobile ? "mobile" : "desktop";
+
+  // Selalu update token setiap login supaya tidak expired
   await set(ref(db, `users/${uid}/fcm_tokens/${key}`), {
     token,
     updated_at: new Date().toISOString(),
-    platform:   navigator.userAgent.includes("Mobile") ? "mobile" : "desktop",
+    platform,
   });
 }
 
