@@ -10,7 +10,6 @@
  */
 
 import { login as authLogin, register as authRegister, makeUID } from "./services/auth.service.js";
-import { loadUserData }   from "./services/firebase.service.js";
 import { loadUserData, _app } from "./services/firebase.service.js";
 import {
   state, initState, resetState, addTransaction, tarikInvestasi,
