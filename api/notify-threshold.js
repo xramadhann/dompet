@@ -22,16 +22,27 @@ const THRESHOLDS = [
   { pct: 100, emoji: "🔴", level: "over" },
 ];
 
-function buildNotif(threshold, realPct) {
+function buildNotif(threshold, realPct, totalIncome, totalExpense) {
   const { emoji, level } = threshold;
-  const title = level === "over"
-    ? `${emoji} Budget Habis! (${realPct}%)`
-    : `${emoji} Pengeluaran Sudah ${realPct}%!`;
-  const body = level === "over"
-    ? `Pengeluaran bulan ini sudah ${realPct}% dari pemasukan, kamu defisit!`
-    : level === "critical"
-    ? `Pengeluaran bulan ini sudah ${realPct}% dari pemasukan, hati-hati!`
-    : `Pengeluaran bulan ini sudah ${realPct}% dari pemasukan, jangan boros-boros ya!`;
+  const deficit  = totalExpense - totalIncome;
+  const sisaRp   = totalIncome - totalExpense;
+  const sisaPct  = 100 - realPct;
+
+  let title, body;
+
+  if (level === "over") {
+    // Pengeluaran > 100% — defisit
+    const deficitRp = new Intl.NumberFormat("id-ID").format(deficit);
+    const deficitPct = Math.round(deficit / totalIncome * 100);
+    title = `🔴 Pengeluaran melebihi pemasukan!`;
+    body  = `Bulan ini kamu defisit Rp ${deficitRp} (${deficitPct}% lebih besar dari pemasukan). Cek pengeluaran kamu!`;
+  } else {
+    // Pengeluaran mendekati batas
+    const sisaRpFmt = new Intl.NumberFormat("id-ID").format(Math.abs(sisaRp));
+    title = `${emoji} Pengeluaran sudah ${realPct}% dari pemasukan!`;
+    body  = `Sisa budget kamu tinggal Rp ${sisaRpFmt} (${sisaPct}% lagi). Jangan boros-boros ya!`;
+  }
+
   return { title, body };
 }
 
@@ -62,7 +73,7 @@ module.exports = async function handler(req, res) {
       const flagSnap = await db.ref(`users/${uid}/notif_sent/${flagKey}`).get();
       if (flagSnap.exists()) continue;
 
-      const { title, body } = buildNotif(t, pct);
+      const { title, body } = buildNotif(t, pct, totalIncome, totalExpense);
       const result = await messaging.sendEachForMulticast({
         tokens,
         notification: { title, body },
