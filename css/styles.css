@@ -86,13 +86,6 @@ body {
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
 }
-
-.logo-icon img { 
-  width: 50px;
-  height: auto; 
-  border-radius: 10px;
-}
-
 .logo-text {
   font-size: 22px; font-weight: 800;
   color: var(--ink); letter-spacing: -0.3px;
@@ -469,3 +462,72 @@ select.form-input option { background:var(--white); }
 ::-webkit-scrollbar { width:5px; }
 ::-webkit-scrollbar-track { background:transparent; }
 ::-webkit-scrollbar-thumb { background:var(--bg2);border-radius:99px; }
+
+/* ── SUBMIT LOADING STATE ─────────────────────────────────────── */
+.btn-loading {
+  position: relative;
+  pointer-events: none;
+  opacity: 0.8;
+}
+.btn-loading .btn-text { visibility: hidden; }
+.btn-loading::after {
+  content: '';
+  position: absolute;
+  width: 16px; height: 16px;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  border: 2px solid rgba(255,255,255,0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+
+/* ── SKELETON ─────────────────────────────────────────────────── */
+.skeleton {
+  background: linear-gradient(90deg, var(--bg2) 25%, var(--bg) 50%, var(--bg2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  border-radius: var(--r-sm);
+}
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+.skeleton-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 8px;
+}
+.skeleton-row + .skeleton-row { border-top: 1px solid var(--border); }
+.skeleton-ico  { width: 40px; height: 40px; border-radius: var(--r-md); flex-shrink: 0; }
+.skeleton-body { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.skeleton-line { height: 12px; border-radius: 6px; }
+.skeleton-line.w-60 { width: 60%; }
+.skeleton-line.w-40 { width: 40%; }
+.skeleton-amt  { width: 64px; height: 16px; border-radius: 6px; flex-shrink: 0; }
+
+/* ── MODAL OVERLAY LOADING ────────────────────────────────────── */
+.modal-loading-overlay {
+  display: none;
+  position: absolute; inset: 0;
+  background: rgba(255,255,255,0.75);
+  backdrop-filter: blur(3px);
+  border-radius: var(--r-2xl) var(--r-2xl) 0 0;
+  z-index: 10;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+.modal-loading-overlay.show { display: flex; }
+.modal-loading-spinner {
+  width: 40px; height: 40px;
+  border: 3px solid var(--bg2);
+  border-top-color: var(--ink);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+.modal-loading-text {
+  font-size: 13px; font-weight: 600;
+  color: var(--ink2);
+}
