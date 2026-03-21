@@ -115,42 +115,34 @@ const THRESHOLD_KEYS = {
 };
 
 export async function checkAndNotifyThreshold(uid, totalIncome, totalExpense) {
-  if (!totalIncome || totalIncome <= 0) return;
+  // Kalau tidak ada pemasukan sama sekali, skip
+  if (totalExpense <= 0) return;
+  // Kalau income 0 tapi ada pengeluaran, anggap 100%
+  const income = totalIncome > 0 ? totalIncome : 0;
 
   try {
-    // Panggil Vercel API — kirim push ke semua device user
-    await fetch("/api/notify-threshold", {
+    const res = await fetch("/api/notify-threshold", {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ uid, totalIncome, totalExpense }),
+      body:    JSON.stringify({ uid, totalIncome: income, totalExpense }),
     });
+    const data = await res.json();
+    console.log("[Threshold API]", data);
   } catch (e) {
     console.warn("Gagal kirim threshold notif:", e);
   }
 }
 
 // ── Notif konfirmasi setelah catat transaksi ───────────────────
-export async function notifyTransactionSaved(tx) {
-  if (Notification.permission !== "granted") return;
-
-  const isIn  = tx.type === "in";
-  const emoji = isIn ? "💰" : "💸";
-  const label = isIn ? "Pemasukan" : "Pengeluaran";
-  const sign  = isIn ? "+" : "-";
-  const amt   = tx.amount.toLocaleString("id-ID");
-
-  const title = `${emoji} ${label} dicatat!`;
-  const body  = `${tx.name} · ${sign}Rp ${amt}`;
-
+// Kirim via Vercel API supaya push ke semua device user
+export async function notifyTransactionSaved(uid, tx) {
   try {
-    const swReg = await navigator.serviceWorker.ready;
-    await swReg.showNotification(title, {
-      body,
-      icon:    "https://dompet-five.vercel.app/icon-512.png",
-      badge:   "https://dompet-five.vercel.app/icon-512.png",
-      vibrate: [100],
+    await fetch("/api/notify-transaction", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ uid, tx }),
     });
-  } catch {
-    new Notification(title, { body, icon: "https://dompet-five.vercel.app/icon-512.png" });
+  } catch (e) {
+    console.warn("Gagal kirim notif transaksi:", e);
   }
 }
