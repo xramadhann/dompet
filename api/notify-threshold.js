@@ -16,11 +16,24 @@ const db        = admin.database();
 const messaging = admin.messaging();
 
 const THRESHOLDS = [
-  { pct: 50,  title: "💸 Setengah Budget Terpakai", body: "Pengeluaran bulan ini sudah 50% dari pemasukan, jangan boros-boros ya!" },
-  { pct: 75,  title: "⚠️ Budget Sudah 75%!",        body: "Pengeluaran bulan ini sudah 75% dari pemasukan, mulai hemat ya!" },
-  { pct: 90,  title: "🚨 Budget Hampir Habis!",     body: "Pengeluaran bulan ini sudah 90% dari pemasukan, hati-hati!" },
-  { pct: 100, title: "🔴 Budget Habis!",             body: "Pengeluaran bulan ini sudah 100% dari pemasukan, kamu defisit!" },
+  { pct: 50,  emoji: "💸", level: "warning" },
+  { pct: 75,  emoji: "⚠️", level: "danger" },
+  { pct: 90,  emoji: "🚨", level: "critical" },
+  { pct: 100, emoji: "🔴", level: "over" },
 ];
+
+function buildNotif(threshold, realPct) {
+  const { emoji, level } = threshold;
+  const title = level === "over"
+    ? `${emoji} Budget Habis! (${realPct}%)`
+    : `${emoji} Pengeluaran Sudah ${realPct}%!`;
+  const body = level === "over"
+    ? `Pengeluaran bulan ini sudah ${realPct}% dari pemasukan, kamu defisit!`
+    : level === "critical"
+    ? `Pengeluaran bulan ini sudah ${realPct}% dari pemasukan, hati-hati!`
+    : `Pengeluaran bulan ini sudah ${realPct}% dari pemasukan, jangan boros-boros ya!`;
+  return { title, body };
+}
 
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
@@ -49,9 +62,10 @@ module.exports = async function handler(req, res) {
       const flagSnap = await db.ref(`users/${uid}/notif_sent/${flagKey}`).get();
       if (flagSnap.exists()) continue;
 
+      const { title, body } = buildNotif(t, pct);
       const result = await messaging.sendEachForMulticast({
         tokens,
-        notification: { title: t.title, body: t.body },
+        notification: { title, body },
         webpush: {
           notification: {
             icon:    "https://dompet-five.vercel.app/icon-512.png",
