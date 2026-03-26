@@ -29,9 +29,16 @@ export async function renderDashboard() {
 
   const mo  = byMonth(dashY, dashM);
   const inc = incSum(mo), exp = expSum(mo);
-  const sisaSaldo     = getSisaSaldo();
+  const sisaSaldo      = getSisaSaldo();
   const totalInvestasi = getTotalInvestasi();
   const investasiCount = state.transactions.filter(t => t.cat === "Investasi").length;
+
+  // ── Kalkulasi sedekah ────────────────────────────────────────
+  const sedekahTx      = state.transactions.filter(t => t.cat === "Sedekah");
+  const totalSedekah   = sedekahTx.reduce((s, t) => s + t.amount, 0);
+  const sedekahCount   = sedekahTx.length;
+  const sedekahBulanIni = mo.filter(t => t.cat === "Sedekah")
+                            .reduce((s, t) => s + t.amount, 0);
 
   const labelM = state.transactions.length === 0 ? now.getMonth() : dashM;
   const labelY = state.transactions.length === 0 ? now.getFullYear() : dashY;
@@ -39,10 +46,60 @@ export async function renderDashboard() {
 
   // ── Stat cards ──────────────────────────────────────────────
   const stats = [
-    { lbl: "Pemasukan",   val: rpFull(inc),         ch: inc > 0 ? "▲ bulan ini" : "—",   dir: inc > 0 ? "up" : "neutral",      bg: "var(--teal-bg)",   ic: "var(--teal)",   ico: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>' },
-    { lbl: "Pengeluaran", val: rpFull(exp),          ch: exp > 0 ? "▼ bulan ini" : "—",   dir: exp > 0 ? "down" : "neutral",    bg: "var(--rose-bg)",   ic: "var(--rose)",   ico: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>' },
-    { lbl: "Sisa Saldo",  val: rpFull(sisaSaldo),   ch: state.saldoAwal > 0 ? `+ saldo awal ${rpFull(state.saldoAwal)}` : (sisaSaldo > 0 ? "▲ akumulasi" : "—"), dir: sisaSaldo >= 0 ? "up" : "neutral", bg: "var(--violet-bg)", ic: "var(--violet)", ico: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="2" y="5" width="20" height="14" rx="3"/><path d="M16 12h2"/><path d="M2 10h20"/></svg>' },
-    { lbl: "Investasi",   val: rpFull(totalInvestasi), ch: investasiCount > 0 ? `+${investasiCount} transaksi` : `Modal awal ${rpFull(state.investasiAwal)}`, dir: totalInvestasi > 0 ? "up" : "neutral", bg: "var(--blue-bg)", ic: "var(--blue)", ico: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>', extra: true },
+    {
+      lbl: "Pemasukan",
+      val: rpFull(inc),
+      ch:  inc > 0 ? "▲ bulan ini" : "—",
+      dir: inc > 0 ? "up" : "neutral",
+      bg:  "var(--teal-bg)",
+      ic:  "var(--teal)",
+      ico: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>',
+    },
+    {
+      lbl: "Pengeluaran",
+      val: rpFull(exp),
+      ch:  exp > 0 ? "▼ bulan ini" : "—",
+      dir: exp > 0 ? "down" : "neutral",
+      bg:  "var(--rose-bg)",
+      ic:  "var(--rose)",
+      ico: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>',
+    },
+    {
+      lbl: "Sedekah",
+      val: rpFull(totalSedekah),
+      ch:  sedekahBulanIni > 0
+             ? `▲ ${rpFull(sedekahBulanIni)} bulan ini`
+             : sedekahCount > 0
+               ? `+${sedekahCount} transaksi`
+               : "—",
+      dir: totalSedekah > 0 ? "up" : "neutral",
+      bg:  "var(--emerald-bg)",
+      ic:  "var(--emerald)",
+      ico: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>',
+    },
+    {
+      lbl: "Sisa Saldo",
+      val: rpFull(sisaSaldo),
+      ch:  state.saldoAwal > 0
+             ? `+ saldo awal ${rpFull(state.saldoAwal)}`
+             : sisaSaldo > 0 ? "▲ akumulasi" : "—",
+      dir: sisaSaldo >= 0 ? "up" : "neutral",
+      bg:  "var(--violet-bg)",
+      ic:  "var(--violet)",
+      ico: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="2" y="5" width="20" height="14" rx="3"/><path d="M16 12h2"/><path d="M2 10h20"/></svg>',
+    },
+    {
+      lbl:   "Investasi",
+      val:   rpFull(totalInvestasi),
+      ch:    investasiCount > 0
+               ? `+${investasiCount} transaksi`
+               : `Modal awal ${rpFull(state.investasiAwal)}`,
+      dir:   totalInvestasi > 0 ? "up" : "neutral",
+      bg:    "var(--blue-bg)",
+      ic:    "var(--blue)",
+      ico:   '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>',
+      extra: true,
+    },
   ];
 
   document.getElementById("dashStats").innerHTML = stats.map((s) => `
