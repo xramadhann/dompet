@@ -65,6 +65,17 @@ export async function renderDashboard() {
       ico: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>',
     },
     {
+      lbl: "Sisa Saldo",
+      val: rpFull(sisaSaldo),
+      ch:  state.saldoAwal > 0
+             ? `+ saldo awal ${rpFull(state.saldoAwal)}`
+             : sisaSaldo > 0 ? "▲ akumulasi" : "—",
+      dir: sisaSaldo >= 0 ? "up" : "neutral",
+      bg:  "var(--violet-bg)",
+      ic:  "var(--violet)",
+      ico: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="2" y="5" width="20" height="14" rx="3"/><path d="M16 12h2"/><path d="M2 10h20"/></svg>',
+    },
+    {
       lbl: "Sedekah",
       val: rpFull(totalSedekah),
       ch:  sedekahBulanIni > 0
@@ -76,17 +87,6 @@ export async function renderDashboard() {
       bg:  "var(--emerald-bg)",
       ic:  "var(--emerald)",
       ico: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>',
-    },
-    {
-      lbl: "Sisa Saldo",
-      val: rpFull(sisaSaldo),
-      ch:  state.saldoAwal > 0
-             ? `+ saldo awal ${rpFull(state.saldoAwal)}`
-             : sisaSaldo > 0 ? "▲ akumulasi" : "—",
-      dir: sisaSaldo >= 0 ? "up" : "neutral",
-      bg:  "var(--violet-bg)",
-      ic:  "var(--violet)",
-      ico: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="2" y="5" width="20" height="14" rx="3"/><path d="M16 12h2"/><path d="M2 10h20"/></svg>',
     },
     {
       lbl:   "Investasi",
@@ -102,7 +102,7 @@ export async function renderDashboard() {
     },
   ];
 
-  document.getElementById("dashStats").innerHTML = stats.map((s) => `
+  const _statCardHTML = (s) => `
     <div class="stat-card">
       <div class="stat-icon" style="background:${s.bg};color:${s.ic}">${s.ico}</div>
       <div class="stat-label">${s.lbl}</div>
@@ -111,7 +111,15 @@ export async function renderDashboard() {
         <div class="stat-change ${s.dir}">${s.ch}</div>
         ${s.extra ? `<button onclick="window.__openTarikModal()" style="font-family:'Plus Jakarta Sans',sans-serif;font-size:10.5px;font-weight:700;padding:4px 10px;border-radius:6px;border:1.5px solid rgba(59,130,246,0.3);background:var(--blue-bg);color:var(--blue);cursor:pointer;white-space:nowrap;">Tarik Dana</button>` : ""}
       </div>
-    </div>`).join("");
+    </div>`;
+
+  document.getElementById("dashStats").innerHTML = `
+    <div class="stats-row stats-row-2">
+      ${stats.slice(0, 2).map(_statCardHTML).join("")}
+    </div>
+    <div class="stats-row stats-row-3">
+      ${stats.slice(2, 5).map(_statCardHTML).join("")}
+    </div>`;
 
   // ── Alert ────────────────────────────────────────────────────
   const alertEl = document.getElementById("dashAlert");
