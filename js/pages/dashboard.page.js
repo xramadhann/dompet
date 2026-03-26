@@ -34,9 +34,9 @@ export async function renderDashboard() {
   const investasiCount = state.transactions.filter(t => t.cat === "Investasi").length;
 
   // ── Kalkulasi sedekah ────────────────────────────────────────
-  const sedekahTx      = state.transactions.filter(t => t.cat === "Sedekah");
-  const totalSedekah   = sedekahTx.reduce((s, t) => s + t.amount, 0);
-  const sedekahCount   = sedekahTx.length;
+  const sedekahTx       = state.transactions.filter(t => t.cat === "Sedekah");
+  const totalSedekah    = sedekahTx.reduce((s, t) => s + t.amount, 0);
+  const sedekahCount    = sedekahTx.length;
   const sedekahBulanIni = mo.filter(t => t.cat === "Sedekah")
                             .reduce((s, t) => s + t.amount, 0);
 
@@ -102,8 +102,18 @@ export async function renderDashboard() {
     },
   ];
 
-  document.getElementById("dashStats").innerHTML = stats.map((s) => `
-    <div class="stat-card">
+  // ── Render cards + simetri ───────────────────────────────────
+  // Layout: 3 card baris atas, 2 card baris bawah rata tengah.
+  // Caranya: baris ke-2 dimulai dari grid-column 2 agar center.
+  //
+  //  [ Pemasukan ]  [ Pengeluaran ]  [ Sedekah  ]
+  //               [ Sisa Saldo ]  [ Investasi ]
+  //
+  const cardsHTML = stats.map((s, i) => {
+    // Card ke-4 (index 3) → mulai dari kolom 2 agar 2 card terakhir tampak tengah
+    const gridStyle = i === 3 ? ' style="grid-column:2"' : "";
+    return `
+    <div class="stat-card"${gridStyle}>
       <div class="stat-icon" style="background:${s.bg};color:${s.ic}">${s.ico}</div>
       <div class="stat-label">${s.lbl}</div>
       <div class="stat-val" style="color:${s.ic}">${s.val}</div>
@@ -111,7 +121,18 @@ export async function renderDashboard() {
         <div class="stat-change ${s.dir}">${s.ch}</div>
         ${s.extra ? `<button onclick="window.__openTarikModal()" style="font-family:'Plus Jakarta Sans',sans-serif;font-size:10.5px;font-weight:700;padding:4px 10px;border-radius:6px;border:1.5px solid rgba(59,130,246,0.3);background:var(--blue-bg);color:var(--blue);cursor:pointer;white-space:nowrap;">Tarik Dana</button>` : ""}
       </div>
-    </div>`).join("");
+    </div>`;
+  }).join("");
+
+  const dashStatsEl = document.getElementById("dashStats");
+  dashStatsEl.innerHTML = cardsHTML;
+
+  // Paksa grid 3 kolom
+  dashStatsEl.style.cssText = `
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--gap, 16px);
+  `;
 
   // ── Alert ────────────────────────────────────────────────────
   const alertEl = document.getElementById("dashAlert");
