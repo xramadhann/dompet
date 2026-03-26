@@ -213,8 +213,20 @@ body {
 
 /* ── STATS GRID ──────────────────────────────────────────── */
 .stats-grid {
-  display: grid; grid-template-columns: repeat(5,1fr); gap: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
   margin-bottom: 20px;
+}
+.stats-row {
+  display: grid;
+  gap: 14px;
+}
+.stats-row-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+.stats-row-3 {
+  grid-template-columns: repeat(3, 1fr);
 }
 .stat-card {
   background: var(--white);
@@ -224,12 +236,14 @@ body {
   border: 1px solid var(--border);
   transition: transform 0.18s, box-shadow 0.18s;
   animation: riseUp 0.4s ease both;
+  box-sizing: border-box;
 }
 .stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
-.stat-card:nth-child(1){animation-delay:.04s}
-.stat-card:nth-child(2){animation-delay:.08s}
-.stat-card:nth-child(3){animation-delay:.12s}
-.stat-card:nth-child(4){animation-delay:.16s}
+.stats-row-2 .stat-card:nth-child(1){animation-delay:.04s}
+.stats-row-2 .stat-card:nth-child(2){animation-delay:.08s}
+.stats-row-3 .stat-card:nth-child(1){animation-delay:.12s}
+.stats-row-3 .stat-card:nth-child(2){animation-delay:.16s}
+.stats-row-3 .stat-card:nth-child(3){animation-delay:.20s}
 @keyframes riseUp {
   from { opacity:0; transform:translateY(12px); }
   to   { opacity:1; transform:none; }
@@ -421,7 +435,8 @@ select.form-input option { background:var(--white); }
 
 /* ── RESPONSIVE ──────────────────────────────────────────── */
 @media (max-width: 900px) {
-  .stats-grid    { grid-template-columns: repeat(2,1fr); }
+  .stats-row-2 { grid-template-columns: repeat(2,1fr); }
+  .stats-row-3 { grid-template-columns: repeat(3,1fr); }
   .two-col       { grid-template-columns: 1fr; }
   .report-stats  { grid-template-columns: repeat(2,1fr); }
   .budget-grid   { grid-template-columns: repeat(2,1fr); }
@@ -446,7 +461,9 @@ select.form-input option { background:var(--white); }
   .month-label{ font-size:13px; }
 }
 @media (max-width: 480px) {
-  .stats-grid  { grid-template-columns:1fr 1fr;gap:10px; }
+  .stats-row-2 { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stats-row-3 { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stats-row-3 .stat-card:last-child { grid-column: 1 / -1; }
   .report-stats{ grid-template-columns:1fr 1fr;gap:10px; }
   .budget-grid { grid-template-columns:1fr 1fr;gap:10px; }
   .topbar-actions .btn span { display:none; }
