@@ -86,7 +86,6 @@ body {
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
 }
-.logo-icon img { width: 18px; height: 18px; fill: #fff; }
 .logo-text {
   font-size: 22px; font-weight: 800;
   color: var(--ink); letter-spacing: -0.3px;
@@ -214,12 +213,12 @@ body {
 
 /* ── STATS GRID ──────────────────────────────────────────── */
 .stats-grid {
-  display: grid; grid-template-columns: repeat(4,1fr); gap: 14px;
+  display: grid; grid-template-columns: repeat(5,1fr); gap: 14px;
   margin-bottom: 20px;
 }
 .stat-card {
   background: var(--white);
-  border-radius: var(--r-xl);
+  border-radius: 4px;
   padding: 20px;
   box-shadow: var(--shadow-sm);
   border: 1px solid var(--border);

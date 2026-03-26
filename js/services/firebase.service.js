@@ -28,6 +28,8 @@ export const PATH = {
   lastYM:        uid  => `users/${uid}/last_ym`,
   transactions:  uid  => `users/${uid}/transactions`,
   transaction:  (uid, txId) => `users/${uid}/transactions/${txId}`,
+  budgets:       uid  => `users/${uid}/budgets`,
+  budget:       (uid, id)   => `users/${uid}/budgets/${id}`,
   usernameToUid: ()   => `username_to_uid`,
   userIndex:     ()   => `user_index`,
 };
@@ -161,6 +163,25 @@ export async function deleteTransaction(uid, txId) {
 /** Hapus semua transaksi user */
 export async function clearAllTransactions(uid) {
   await _del(PATH.transactions(uid));
+}
+
+// ── Budgets ────────────────────────────────────────────────────
+
+/** Ambil semua anggaran user */
+export async function loadBudgets(uid) {
+  const snap = await _get(PATH.budgets(uid));
+  if (!snap.exists()) return [];
+  return Object.values(snap.val());
+}
+
+/** Simpan satu anggaran */
+export async function saveBudget(uid, budget) {
+  await _set(PATH.budget(uid, budget.id), budget);
+}
+
+/** Hapus satu anggaran */
+export async function deleteBudget(uid, id) {
+  await _del(PATH.budget(uid, id));
 }
 
 // ── Re-export Firebase refs untuk onValue (realtime listener) ──
